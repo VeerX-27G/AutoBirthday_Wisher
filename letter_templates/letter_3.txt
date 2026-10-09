@@ -1,6 +1,6 @@
 Dear [NAME],
 
-It's your birthday! Have a great day!
+It's your [AGE] birthday! Have a great day!
 
 All my love,
 
