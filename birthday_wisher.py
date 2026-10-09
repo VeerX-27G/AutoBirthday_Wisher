@@ -1,7 +1,8 @@
 """Auto Birthday Wisher
 
 Reads birthdays.csv, and if anyone has a birthday today, emails them a random
-letter from letter_templates/ with [NAME] replaced by their name.
+letter from letter_templates/ with [NAME] replaced by their name and [AGE]
+replaced by the age they are turning (e.g. "21st").
 
 Runs locally (credentials from a .env file) or on GitHub Actions
 (credentials from repository secrets exposed as environment variables).
@@ -41,9 +42,24 @@ if not DRY_RUN:
 today = datetime.now(ZoneInfo(TIMEZONE))
 today_tuple = (today.month, today.day)
 
-# Someone born on Feb 29 gets their wish on Feb 28 in years that have no Feb 29.
-is_leap_year = today.year % 4 == 0 and (today.year % 100 != 0 or today.year % 400 == 0)
-include_leap_day = today_tuple == (2, 28) and not is_leap_year
+
+def ordinal(n):
+    """1 -> '1st', 2 -> '2nd', 11 -> '11th', 23 -> '23rd', 112 -> '112th'."""
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def new_age(row):
+    """The age the person is turning today, or None if the year is missing/invalid."""
+    try:
+        age = today.year - int(row["year"])
+    except (KeyError, ValueError, TypeError):
+        return None
+    return age if age > 0 else None
+
 
 try:
     data = pandas.read_csv("birthdays.csv")
@@ -55,18 +71,18 @@ if not required_columns.issubset(data.columns):
     sys.exit(f"❌ birthdays.csv must have these columns: {', '.join(sorted(required_columns))}")
 
 # Everyone whose birthday is today (more than one person can share a birthday).
+# Feb 29 birthdays are only matched on Feb 29 itself (leap years), never on Feb 28.
 birthday_people = []
 seen_emails = set()
 for _, row in data.iterrows():
     row_tuple = (int(row["month"]), int(row["day"]))
-    is_today = row_tuple == today_tuple or (include_leap_day and row_tuple == (2, 29))
-    if not is_today:
+    if row_tuple != today_tuple:
         continue
     email = str(row["email"]).strip()
     if email in seen_emails:  # skip accidental duplicate rows
         continue
     seen_emails.add(email)
-    birthday_people.append((str(row["name"]).strip(), email))
+    birthday_people.append((str(row["name"]).strip(), email, new_age(row)))
 
 if not birthday_people:
     print(f"No birthdays today ({today:%B %d}).")
@@ -77,11 +93,18 @@ if not templates:
     sys.exit("❌ No letter templates found in letter_templates/ (expected letter_1.txt, letter_2.txt, ...)")
 
 
-def build_message(name, email):
+def build_message(name, email, age):
     with open(random.choice(templates), encoding="utf-8") as letter_file:
         contents = letter_file.read().replace("[NAME]", name)
+    if age:
+        contents = contents.replace("[AGE]", ordinal(age))
+        subject = f"Happy {ordinal(age)} Birthday!"
+    else:
+        # No usable year in the CSV: drop the placeholder and keep a plain greeting.
+        contents = contents.replace("[AGE] ", "").replace("[AGE]", "")
+        subject = "Happy Birthday!"
     msg = EmailMessage()
-    msg["Subject"] = "Happy Birthday!"
+    msg["Subject"] = subject
     msg["From"] = MY_EMAIL
     msg["To"] = email
     msg.set_content(contents)  # UTF-8, so names/emoji with accents work
@@ -89,8 +112,9 @@ def build_message(name, email):
 
 
 if DRY_RUN:
-    for name, email in birthday_people:
-        print(f"[DRY RUN] Would send a birthday email to {name} <{email}>")
+    for name, email, age in birthday_people:
+        wish = f"Happy {ordinal(age)} birthday" if age else "Happy birthday"
+        print(f"[DRY RUN] Would send '{wish}' to {name} <{email}>")
     sys.exit(0)
 
 failures = 0
@@ -98,9 +122,9 @@ try:
     with smtplib.SMTP("smtp.gmail.com", 587) as connection:
         connection.starttls()
         connection.login(MY_EMAIL, MY_PASSWORD)
-        for name, email in birthday_people:
+        for name, email, age in birthday_people:
             try:
-                connection.send_message(build_message(name, email))
+                connection.send_message(build_message(name, email, age))
                 # Email addresses are deliberately not printed: workflow logs can be public.
                 print(f"🎂 Birthday email sent to {name}")
             except Exception as e:
