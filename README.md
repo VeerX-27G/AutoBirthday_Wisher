@@ -49,11 +49,11 @@ Go to **Settings -> Secrets and variables -> Actions -> New repository secret** 
 
 ### 4. Check the schedule
 
-The workflow runs every day at **14:00 UTC (8:00 AM in Regina)**. To change the time, edit the `cron` line in `.github/workflows/birthday_wisher.yaml`:
+The workflow runs every day at **06:00 UTC (0:00 AM in Regina)**. To change the time, edit the `cron` line in `.github/workflows/birthday_wisher.yaml`:
 
 ```yaml
 schedule:
-  - cron: "0 14 * * *"
+  - cron: "0 6 * * *"
 ```
 
 ### 5. Test it
@@ -83,12 +83,6 @@ Open the **Actions** tab, choose **Birthday Wisher** on the left, and click **Ru
    ```
 
 To see who would be emailed without sending anything, set `DRY_RUN=1` first (for example `DRY_RUN=1 python birthday_wisher.py`).
-
-## Privacy
-
-If this repository is public, `birthdays.csv` is public too, including everyone's name and email address. Make the repository **private** (Settings -> General -> Danger Zone -> Change visibility) before adding real people. Private repositories can still run scheduled GitHub Actions.
-
-The script never prints email addresses to the workflow log.
 
 ## Notes
 
