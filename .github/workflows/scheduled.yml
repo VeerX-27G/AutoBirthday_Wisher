@@ -27,6 +27,6 @@ jobs:
 
       - name: Run script
         env:
-          MY_EMAIL: ${{ secrets.MY_EMAIL }}
-          MY_PASSWORD: ${{ secrets.MY_PASSWORD }}
+          MY_EMAIL: ${{ secrets.EMAIL }}
+          MY_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
         run: python birthday_wisher.py
