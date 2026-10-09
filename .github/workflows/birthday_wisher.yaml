@@ -1,0 +1,36 @@
+name: Birthday Wisher
+
+on:
+  schedule:
+    # Saskatchewan stays on UTC-6 all year, no DST.
+    # Change the hour to whatever time you want the wishes to go out.
+    - cron: "0 6 * * *"
+  workflow_dispatch: # lets you run it manually from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  wish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send birthday wishes
+        env:
+          EMAIL: ${{ secrets.EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          TIMEZONE: America/Regina
+        run: python birthday_wisher.py
